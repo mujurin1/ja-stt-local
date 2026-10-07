@@ -1,0 +1,5 @@
+node_modules/
+dist/
+.cache/
+# テスト音声は tools/make-fixtures.py で HF から取得・生成する
+test/fixtures/

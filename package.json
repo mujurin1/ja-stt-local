@@ -1,0 +1,20 @@
+{
+  "name": "speech-to-text",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "setup": "node tools/setup-vendor.ts",
+    "dev": "vite",
+    "build": "pnpm typecheck && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsgo -p tsconfig.json && tsgo -p tsconfig.worker.json && tsgo -p tsconfig.node.json",
+    "deploy": "pnpm build && surge dist"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "playwright": "^1.63.0",
+    "vite": "^8.3.3",
+    "vite-plugin-singlefile": "^2.3.3"
+  }
+}
