@@ -19,33 +19,41 @@
     width: 1200px;
     height: 630px;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 18px;
+    gap: 44px;
   }
-  .lead { font-size: 72px; font-weight: 800; color: #2563eb; letter-spacing: 0.04em; }
-  h1 { font-size: 136px; font-weight: 900; letter-spacing: 0.01em; }
+  .text { display: flex; flex-direction: column; gap: 20px; }
+  h1 { font-size: 72px; font-weight: 900; letter-spacing: 0.01em; line-height: 1.1; }
+  .sub { font-size: 32px; font-weight: 700; color: #64748b; letter-spacing: 0.04em; }
 
-  /* ファビコン切り出し用（OGP 画像には写らない位置に置く） */
+  /* アプリアイコン。ファビコンもこの要素を切り出す */
   .mic {
-    position: absolute;
-    left: -400px;
-    top: 0;
-    width: 256px; height: 256px; border-radius: 72px;
+    flex: none;
+    width: 168px; height: 168px; border-radius: 48px;
     background: #2563eb; display: grid; place-items: center;
+    box-shadow: 0 12px 32px rgb(37 99 235 / 0.25);
   }
+  .mic svg { width: 58%; height: 58%; }
+
+  /* ファビコン書き出し時（make-og.ts が body に付ける） */
+  body.favicon { background: transparent; }
+  body.favicon .card { display: block; }
+  body.favicon .text { display: none; }
+  body.favicon .mic { width: 256px; height: 256px; border-radius: 72px; box-shadow: none; }
 </style>
 </head>
 <body>
   <div class="card">
-    <div class="lead">ブラウザで動く</div>
-    <h1>ローカル音声認識</h1>
-  </div>
-  <div class="mic">
-    <svg width="150" height="150" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-      <rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><path d="M12 18v4"/>
-    </svg>
+    <div class="mic">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><path d="M12 18v4"/>
+      </svg>
+    </div>
+    <div class="text">
+      <h1>ブラウザ音声認識アプリ</h1>
+      <div class="sub">日本語・リアルタイム・完全ローカル</div>
+    </div>
   </div>
 </body>
 </html>
