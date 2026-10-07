@@ -35,6 +35,7 @@ export const VOICEVOX_SETUP_HELP = [
   'ブラウザで http://127.0.0.1:50021/setting を開き、「Allow Origin」欄に ' + location.origin + ' を追加して保存し、VOICEVOX を再起動してください',
   '（エンジン単体なら起動オプション --allow_origin ' + location.origin + ' でも可）',
   'Chrome で「ローカル ネットワーク上のデバイスへのアクセス」の許可を求められたら「許可」を選んでください',
+  '生成した音声を配信・公開する場合は、キャラクターごとの利用規約に従ってクレジット（例: VOICEVOX:ずんだもん）を表記してください',
 ].join('\n');
 
 export interface VoicevoxSpeaker {

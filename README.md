@@ -37,4 +37,9 @@ pnpm build      # 型チェック（tsgo）+ Vite で dist/ に単一 HTML を�
 
 ## ライセンス
 
-コード: MIT（[LICENSE](LICENSE)）。同梱の sherpa-onnx（`public/vendor`）は Apache-2.0、coi-serviceworker は MIT。モデルはそれぞれのライセンスに従います（画面のモデル一覧に表示）。
+コード: MIT（[LICENSE](LICENSE)）。
+
+同梱している第三者のソフトウェア・モデル（sherpa-onnx: Apache-2.0、ONNX Runtime / Silero VAD / GTCRN / coi-serviceworker: MIT）と改変内容は [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) を参照してください。
+
+- 音声認識モデルは同梱せず、利用者のブラウザが Hugging Face から取得します。各モデルのライセンスは画面に表示しています。Moonshine の日本語モデルは**非商用**ライセンスです。
+- VOICEVOX で生成した音声を公開する場合は、各キャラクターの利用規約に従ってクレジット（例: 「VOICEVOX:ずんだもん」）を表記してください。

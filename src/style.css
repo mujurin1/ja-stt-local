@@ -402,3 +402,4 @@ footer {
   border-top: 1px solid var(--line);
 }
 footer a { color: inherit; }
+footer .footer-right { margin-left: auto; }
