@@ -2,13 +2,13 @@
   "name": "speech-to-text",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@10.34.5",
   "scripts": {
-    "setup": "node tools/setup-vendor.ts",
+    "vendor": "node tools/setup-vendor.ts",
     "dev": "vite",
     "build": "pnpm typecheck && vite build",
     "preview": "vite preview",
-    "typecheck": "tsgo -p tsconfig.json && tsgo -p tsconfig.worker.json && tsgo -p tsconfig.node.json",
-    "deploy": "pnpm build && surge dist"
+    "typecheck": "tsgo -p tsconfig.json && tsgo -p tsconfig.worker.json && tsgo -p tsconfig.node.json"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",

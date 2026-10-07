@@ -1,6 +1,6 @@
 # ブラウザで動くローカル音声認識
 
-https://ja-stt-local.surge.sh/
+https://mujurin1.github.io/ja-stt-local/
 
 インストール不要、ブラウザだけで動く日本語のリアルタイム音声認識です。音声は外部に送信されず、この PC の中だけで文字になります。
 
@@ -20,11 +20,12 @@ https://ja-stt-local.surge.sh/
 
 ```sh
 pnpm install
-pnpm setup      # sherpa-onnx の WASM を取得して public/vendor に配置（同梱済みなので通常は不要）
+pnpm vendor     # sherpa-onnx の WASM を取得して public/vendor に配置（同梱済みなので通常は不要）
 pnpm dev
 pnpm build      # 型チェック（tsgo）+ Vite で dist/ に単一 HTML を出力
-pnpm deploy     # build して surge に公開
 ```
+
+`main` に push すると GitHub Actions がビルドして GitHub Pages に公開します（`.github/workflows/pages.yml`）。
 
 動作確認: `pnpm build && pnpm preview` の後に `node tools/e2e.ts`（テスト音声は `python -I tools/make-fixtures.py test/fixtures` で生成）。
 
