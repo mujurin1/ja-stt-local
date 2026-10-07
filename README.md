@@ -36,4 +36,4 @@ pnpm deploy     # build して surge に公開
 
 ## ライセンス
 
-同梱の sherpa-onnx（`public/vendor`）は Apache-2.0、coi-serviceworker は MIT。モデルはそれぞれのライセンスに従います（画面のモデル一覧に表示）。
+コード: MIT（[LICENSE](LICENSE)）。同梱の sherpa-onnx（`public/vendor`）は Apache-2.0、coi-serviceworker は MIT。モデルはそれぞれのライセンスに従います（画面のモデル一覧に表示）。

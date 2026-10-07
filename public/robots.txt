@@ -1,0 +1,3 @@
+# surge.sh の既定は全拒否（Disallow: /）なので、OGP カード取得のため明示的に許可する
+User-agent: *
+Allow: /
