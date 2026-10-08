@@ -80,10 +80,21 @@ const FATAL_ERRORS: Record<string, string> = {
   'audio-capture': 'マイクを取得できません',
 };
 
+// 長時間動かすと、エラーも end も出ないまま黙って止まることがある（手動で開き直すと治る）。
+// 録音中にどのイベントもこの時間来なければ、止まったとみなして開き直す。
+// 無音が続いて正常にイベントが無いだけでも開き直すが、害はない
+const STALL_MS = 15_000;
+const WATCHDOG_INTERVAL_MS = 5_000;
+const ACTIVITY_EVENTS = ['start', 'audiostart', 'soundstart', 'speechstart', 'speechend', 'soundend', 'audioend'];
+
 export class NativeAsr {
   hooks: NativeAsrHooks;
   rec: Recognition | null = null;
   running = false;
+  lastEvent = 0;
+  watchdog = 0;
+  // 黙って止まったのを開き直した回数
+  recoveries = 0;
   // 録音開始からの経過秒の起点
   t0 = 0;
   // 確定前の発話が始まった時刻（秒）。途中結果が出始めた時点で記録する
@@ -103,12 +114,14 @@ export class NativeAsr {
     this.utteranceStart = null;
     this.failures = 0;
     this.open();
+    this.watchdog ||= window.setInterval(() => this.check(), WATCHDOG_INTERVAL_MS);
   }
 
   // 認識中の発話を確定させてから止める
   stop(): Promise<void> {
     if (!this.running) return Promise.resolve();
     this.running = false;
+    this.stopWatchdog();
     const rec = this.rec;
     if (!rec) return Promise.resolve();
     return new Promise((resolve) => {
@@ -129,6 +142,36 @@ export class NativeAsr {
     return (performance.now() - this.t0) / 1000;
   }
 
+  private stopWatchdog(): void {
+    clearInterval(this.watchdog);
+    this.watchdog = 0;
+  }
+
+  private touch(): void {
+    this.lastEvent = performance.now();
+  }
+
+  private check(): void {
+    if (!this.running) {
+      this.stopWatchdog();
+      return;
+    }
+    // rec が無いのは end 後の再開待ち。その間は見張らない
+    const rec = this.rec;
+    if (!rec || performance.now() - this.lastEvent < STALL_MS) return;
+    this.recoveries++;
+    console.warn(`native asr: ${STALL_MS / 1000} 秒反応が無いため開き直します（${this.recoveries} 回目, ` +
+        `${new Date().toLocaleTimeString('ja-JP', {hour12: false})}）`);
+    // 先に rec を外しておき、abort 後に古いセッションの end が来ても無視させる
+    this.finish();
+    try {
+      rec.abort();
+    } catch {
+      // 既に終わっている
+    }
+    this.open();
+  }
+
   private open(): void {
     const Ctor = recognitionCtor();
     if (!Ctor) {
@@ -141,8 +184,13 @@ export class NativeAsr {
     rec.processLocally = true;
     rec.continuous = true;
     rec.interimResults = true;
-    rec.onresult = (ev) => this.handleResult(ev);
+    for (const type of ACTIVITY_EVENTS) rec.addEventListener(type, () => this.touch());
+    rec.onresult = (ev) => {
+      this.touch();
+      this.handleResult(ev);
+    };
     rec.onerror = (ev) => {
+      this.touch();
       const fatal = FATAL_ERRORS[ev.error];
       if (fatal) {
         this.running = false;
@@ -161,6 +209,7 @@ export class NativeAsr {
       }
     };
     this.rec = rec;
+    this.touch();
     try {
       rec.start();
     } catch (e) {
