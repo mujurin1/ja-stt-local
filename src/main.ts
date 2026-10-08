@@ -5,7 +5,8 @@ import {AsrClient} from './engine/asr-client.ts';
 import type {AsrState} from './engine/asr-client.ts';
 import {DenoiseClient} from './engine/denoise-client.ts';
 import type {DenoiseState} from './engine/denoise-client.ts';
-import {NativeAsr} from './engine/native-asr.ts';
+import {NativeAsr, nativeAsrSupported} from './engine/native-asr.ts';
+import {ComparePanel} from './compare.ts';
 import {hasSavedSettings, loadSettings, saveSettings} from './settings.ts';
 import type {AppSettings} from './settings.ts';
 import {ModelPanel} from './model-panel.ts';
@@ -70,6 +71,8 @@ let readyWaiters: {resolve: () => void; reject: (e: Error) => void}[] = [];
 let recording = false;
 // 録音中のものがブラウザ標準の音声認識か（録音中にモデルを切り替えても正しく止めるため）
 let recordingNative = false;
+// マイク取り込み（MicCapture）が動いているか
+let captureActive = false;
 let startPending = false;
 let fileBusy = false;
 let exportBaseName = '';
@@ -157,18 +160,22 @@ function handleAsrEvent(ev: AsrEvent): void {
       break;
     case 'partial':
       setPartial(ev.text);
+      if (!fileBusy) compare.mainPartial(ev.text);
       break;
     case 'final':
       setPartial('');
+      if (!fileBusy) compare.mainPartial('');
       if (ev.segment.text) {
         appendSegment(ev.segment);
         sendPanel.dispatch(ev.segment.text, fileBusy);
+        if (!fileBusy) compare.mainFinal(ev.segment);
       }
       ui.statDecode.textContent = `${ev.decodeMs.toFixed(0)} ms`;
       break;
     case 'stats':
       ui.statRtf.textContent = ev.rtf > 0 ? ev.rtf.toFixed(3) : '-';
       ui.statQueue.textContent = recording ? `${ev.queueMs.toFixed(0)} ms` : '-';
+      if (recording) compare.mainStatus(`遅れ ${(ev.queueMs / 1000).toFixed(1)}s`);
       break;
     case 'file-progress': {
       const ratio = ev.totalSec > 0 ? ev.doneSec / ev.totalSec : 0;
@@ -236,7 +243,11 @@ function handleCaptureState(state: CaptureState, detail?: string): void {
 }
 
 const asr = new AsrClient(vendorBase, {onEvent: handleAsrEvent, onState: handleAsrState});
-const denoise = new DenoiseClient(vendorBase, (s) => asr.push(s), handleDenoiseState);
+// compare.push はコピーして配るので、transfer で手放す asr.push より先に呼ぶ
+const denoise = new DenoiseClient(vendorBase, (s) => {
+  compare.push(s);
+  if (!recordingNative) asr.push(s);
+}, handleDenoiseState);
 const sendPanel = new SendPanel($<HTMLDivElement>('sendPanel'), $<HTMLSpanElement>('sendTabState'), SEND_TARGETS);
 
 const capture = new MicCapture(captureOptions(), {
@@ -249,10 +260,14 @@ const capture = new MicCapture(captureOptions(), {
 });
 
 const native = new NativeAsr({
-  onPartial: setPartial,
+  onPartial(text) {
+    setPartial(text);
+    compare.mainPartial(text);
+  },
   onFinal(seg) {
     appendSegment(seg);
     sendPanel.dispatch(seg.text, false);
+    compare.mainFinal(seg);
   },
   onFatal(message) {
     void stopRecording();
@@ -284,6 +299,7 @@ function selectModel(spec: ModelSpec): void {
   settings.modelId = spec.id;
   saveSettings(settings);
   renderModelInfo();
+  compare.mainChanged();
   if (spec.kind === 'native') {
     showNativePill();
     updateStartButton();
@@ -305,6 +321,18 @@ const modelPanel = new ModelPanel(ui.modelList, ui.modelDetail, {
       showNativePill();
       updateStartButton();
     }
+  },
+});
+
+const compare = new ComparePanel($<HTMLDivElement>('comparePanel'), {
+  vendorBase,
+  mainModel: currentModel,
+  asrSettings: () => settings.asr,
+  nativeSelectable: nativeAsrSupported,
+  ensureNative: async () => modelPanel.nativeStatus === 'available' || await modelPanel.installNative(),
+  onChanged() {
+    // ブラウザ標準で録音中にダウンロード型のモデルを足したら、マイク取り込みも始める
+    if (recording && compare.needsCapture()) void ensureCapture();
   },
 });
 
@@ -358,6 +386,21 @@ async function requestWakeLock(): Promise<void> {
   }
 }
 
+// マイク取り込み（ダウンロード型モデル用）を始める。ブラウザ標準がメインでも、比較で必要なら使う
+async function ensureCapture(): Promise<boolean> {
+  if (captureActive) return true;
+  captureActive = true;
+  try {
+    await capture.start();
+  } catch (e) {
+    captureActive = false;
+    alert(`マイクを開始できません: ${String(e)}`);
+    return false;
+  }
+  void refreshDevices();
+  return true;
+}
+
 async function startRecording(): Promise<void> {
   if (recording) return;
   if (isNative()) {
@@ -368,6 +411,8 @@ async function startRecording(): Promise<void> {
     exportBaseName = '';
     ui.captureState.textContent = '録音中';
     native.start();
+    compare.start();
+    if (compare.needsCapture()) void ensureCapture();
     updateStartButton();
     void requestWakeLock();
     return;
@@ -378,16 +423,11 @@ async function startRecording(): Promise<void> {
     void ensureModelLoaded().catch(() => {});
     return;
   }
-  try {
-    await capture.start();
-  } catch (e) {
-    alert(`マイクを開始できません: ${String(e)}`);
-    return;
-  }
+  if (!await ensureCapture()) return;
   recording = true;
   exportBaseName = '';
+  compare.start();
   updateStartButton();
-  void refreshDevices();
   void requestWakeLock();
 }
 
@@ -395,15 +435,21 @@ async function stopRecording(): Promise<void> {
   if (!recording) return;
   recording = false;
   updateStartButton();
+  if (captureActive) {
+    captureActive = false;
+    await capture.stop();
+    denoise.reset();
+  }
+  const pending = [compare.stop()];
   if (recordingNative) {
     recordingNative = false;
     ui.captureState.textContent = '';
-    await native.stop();
+    pending.push(native.stop());
   } else {
-    await capture.stop();
-    denoise.reset();
-    await asr.flush();
+    pending.push(asr.flush());
   }
+  await Promise.all(pending);
+  compare.mainStatus('');
   await wakeLock?.release().catch(() => {});
   wakeLock = null;
 }
@@ -504,6 +550,7 @@ function bindSlider(id: string, key: keyof AsrSettings, digits: number): void {
     settings.asr = {...settings.asr, [key]: Number(input.value)};
     saveSettings(settings);
     asr.updateSettings(settings.asr);
+    compare.updateSettings(settings.asr);
   });
 }
 

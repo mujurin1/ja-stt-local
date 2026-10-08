@@ -72,7 +72,7 @@
       </div>
 
       <div class="tab-panel" data-panel="mic" role="tabpanel">
-        <p id="nativeMicNote" class="notice" hidden>ブラウザ標準を選んでいる間は、このタブの設定は効きません（ブラウザ既定のマイクで認識します）</p>
+        <p id="nativeMicNote" class="notice" hidden>ブラウザ標準には、このタブの設定は効きません（ブラウザ既定のマイクで認識します）。比較で追加したモデルには効きます</p>
         <div class="field">
           <label for="deviceSelect">入力デバイス</label>
           <select id="deviceSelect"><option value="">既定のデバイス</option></select>
@@ -116,6 +116,7 @@
     <section class="panel transcript-panel">
       <nav class="tabs" role="tablist" data-tabs="right">
         <button role="tab" data-tab="transcript">文字起こし</button>
+        <button role="tab" data-tab="compare">比較</button>
         <button role="tab" data-tab="send">読み上げ <span id="sendTabState" class="tab-state"></span></button>
       </nav>
 
@@ -135,6 +136,8 @@
         <p id="partialLine" class="partial"></p>
       </div>
       </div>
+
+      <div id="comparePanel" class="tab-panel compare-tab" data-panel="compare" role="tabpanel"></div>
 
       <div class="tab-panel" data-panel="send" role="tabpanel">
         <div id="sendPanel"></div>

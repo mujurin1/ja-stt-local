@@ -401,6 +401,55 @@ button.primary.recording { background: var(--danger); border-color: var(--danger
 .transcript.no-ts .ts { display: none; }
 .partial { color: var(--muted); margin: 0; min-height: 1.8em; }
 
+/* ---- 比較 ---- */
+
+.compare-tab { flex: 1; min-height: 0; }
+.compare-add { max-width: 16em; }
+.compare-grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(220px, 1fr);
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.compare-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.compare-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 0;
+  font-weight: 600;
+}
+.compare-head .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.compare-head button.icon { padding: 0 6px; line-height: 1.4; }
+.compare-status {
+  padding: 0 10px 6px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  min-height: 1.5em;
+}
+.compare-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 10px;
+  line-height: 1.7;
+  max-height: calc(100vh - 280px);
+  min-height: 40vh;
+}
+.compare-body ol { list-style: none; margin: 0; padding: 0; }
+.compare-body li { padding: 2px 0; }
+
 footer {
   display: flex;
   gap: 16px;
