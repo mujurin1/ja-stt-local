@@ -12,6 +12,8 @@ export interface CompareHooks {
   asrSettings(): AsrSettings;
   // ブラウザ標準を追加できるか（端末内認識の API があるか）
   nativeSelectable(): boolean;
+  // 認識結果の整形（日本語の間の空白除去など。メインと同じものを使う）
+  cleanText(text: string): string;
   // ブラウザ標準の言語パックを用意する。使えるなら true
   ensureNative(): Promise<boolean>;
   // 追加・削除のあと（録音中にマイク取り込みが必要になった場合などに使う）
@@ -253,13 +255,16 @@ export class ComparePanel {
     };
   }
 
-  private setPartial(c: Column, text: string): void {
+  // メイン列は整形済みで来るが、もう一度かけても結果は変わらない
+  private setPartial(c: Column, raw: string): void {
     const done = this.stick(c);
-    c.partial.textContent = text;
+    c.partial.textContent = this.hooks.cleanText(raw);
     done();
   }
 
-  private appendFinal(c: Column, text: string): void {
+  private appendFinal(c: Column, raw: string): void {
+    const text = this.hooks.cleanText(raw);
+    if (!text) return;
     const done = this.stick(c);
     c.list.append(el('li', '', text));
     done();

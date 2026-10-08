@@ -10,6 +10,8 @@ export interface AppSettings {
   browserAutoGain: boolean;
   gtcrn: boolean;
   showTimestamps: boolean;
+  // 認識結果の日本語の間の空白を消す（全モデル共通。これから出る結果にだけ効く）
+  removeJaSpaces: boolean;
   asr: AsrSettings;
 }
 
@@ -29,6 +31,7 @@ export function defaultSettings(): AppSettings {
     browserAutoGain: false,
     gtcrn: false,
     showTimestamps: true,
+    removeJaSpaces: true,
     asr: {
       vadThreshold: 0.5,
       minSilenceSec: 0.5,

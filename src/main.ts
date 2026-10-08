@@ -16,7 +16,7 @@ import {modelCacheStatus} from './shared/model-cache.ts';
 import {FALLBACK_MODEL_ID, MODEL_CACHE_NAME, MODELS, modelTotalBytes} from './shared/models.ts';
 import {SAMPLE_RATE} from './shared/protocol.ts';
 import type {AsrEvent, AsrSettings, ModelSpec, Segment} from './shared/protocol.ts';
-import {download, formatClock, toJson, toSrt, toTxt, toVtt} from './transcript.ts';
+import {download, formatClock, removeJaSpaces, toJson, toSrt, toTxt, toVtt} from './transcript.ts';
 
 function $<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
@@ -142,6 +142,11 @@ function clearTranscript(): void {
 
 // ---- エンジン ----
 
+// 認識結果の整形（全モデル共通）。切り替えはこれから出る結果にだけ効く
+function cleanText(text: string): string {
+  return settings.removeJaSpaces ? removeJaSpaces(text) : text;
+}
+
 function handleAsrEvent(ev: AsrEvent): void {
   switch (ev.type) {
     case 'progress': {
@@ -158,20 +163,24 @@ function handleAsrEvent(ev: AsrEvent): void {
     case 'ready':
       console.info(`model ${ev.modelId} ready in ${ev.loadMs.toFixed(0)} ms (threads=${ev.numThreads})`);
       break;
-    case 'partial':
-      setPartial(ev.text);
-      if (!fileBusy) compare.mainPartial(ev.text);
+    case 'partial': {
+      const text = cleanText(ev.text);
+      setPartial(text);
+      if (!fileBusy) compare.mainPartial(text);
       break;
-    case 'final':
+    }
+    case 'final': {
       setPartial('');
       if (!fileBusy) compare.mainPartial('');
-      if (ev.segment.text) {
-        appendSegment(ev.segment);
-        sendPanel.dispatch(ev.segment.text, fileBusy);
-        if (!fileBusy) compare.mainFinal(ev.segment);
+      const seg = {...ev.segment, text: cleanText(ev.segment.text)};
+      if (seg.text) {
+        appendSegment(seg);
+        sendPanel.dispatch(seg.text, fileBusy);
+        if (!fileBusy) compare.mainFinal(seg);
       }
       ui.statDecode.textContent = `${ev.decodeMs.toFixed(0)} ms`;
       break;
+    }
     case 'stats':
       ui.statRtf.textContent = ev.rtf > 0 ? ev.rtf.toFixed(3) : '-';
       ui.statQueue.textContent = recording ? `${ev.queueMs.toFixed(0)} ms` : '-';
@@ -260,11 +269,14 @@ const capture = new MicCapture(captureOptions(), {
 });
 
 const native = new NativeAsr({
-  onPartial(text) {
+  onPartial(raw) {
+    const text = cleanText(raw);
     setPartial(text);
     compare.mainPartial(text);
   },
-  onFinal(seg) {
+  onFinal(raw) {
+    const seg = {...raw, text: cleanText(raw.text)};
+    if (!seg.text) return;
     appendSegment(seg);
     sendPanel.dispatch(seg.text, false);
     compare.mainFinal(seg);
@@ -329,6 +341,7 @@ const compare = new ComparePanel($<HTMLDivElement>('comparePanel'), {
   mainModel: currentModel,
   asrSettings: () => settings.asr,
   nativeSelectable: nativeAsrSupported,
+  cleanText,
   ensureNative: async () => modelPanel.nativeStatus === 'available' || await modelPanel.installNative(),
   onChanged() {
     // ブラウザ標準で録音中にダウンロード型のモデルを足したら、マイク取り込みも始める
@@ -556,7 +569,7 @@ function bindSlider(id: string, key: keyof AsrSettings, digits: number): void {
 
 function bindCheckbox(
     input: HTMLInputElement, key: 'browserNoiseSuppression' | 'browserEchoCancellation' |
-    'browserAutoGain' | 'gtcrn' | 'showTimestamps', onChange: () => void): void {
+    'browserAutoGain' | 'gtcrn' | 'showTimestamps' | 'removeJaSpaces', onChange: () => void): void {
   input.checked = settings[key];
   input.addEventListener('change', () => {
     settings[key] = input.checked;
@@ -606,6 +619,7 @@ function setupUi(): void {
   bindCheckbox(ui.optTimestamps, 'showTimestamps',
                () => ui.transcript.classList.toggle('no-ts', !settings.showTimestamps));
   ui.transcript.classList.toggle('no-ts', !settings.showTimestamps);
+  bindCheckbox($<HTMLInputElement>('optJaSpaces'), 'removeJaSpaces', () => {});
 
   bindSlider('vadThreshold', 'vadThreshold', 2);
   bindSlider('minSilence', 'minSilenceSec', 2);
