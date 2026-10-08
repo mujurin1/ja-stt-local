@@ -4,10 +4,26 @@ import type {ModelSpec} from './protocol.ts';
 // bytes は進捗表示用（Content-Length が取れない場合のフォールバック）。
 export const MODELS: ModelSpec[] = [
   {
+    id: 'browser-native',
+    label: 'ブラウザ標準',
+    tag: 'おすすめ',
+    note: [
+      'Chrome 内蔵の端末内音声認識（Web Speech API）',
+      '初回は Chrome が日本語の言語パックを取得する',
+      'マイク設定・ノイズ対策・ファイル文字起こしは使えない',
+      'Chrome 以外は非対応',
+    ],
+    repo: 'Web Speech API（端末内処理）',
+    kind: 'native',
+    files: {},
+    license: 'Chrome の利用規約に従う',
+    commercial: 'check',
+  },
+  {
     id: 'reazon-v2',
     label: 'ReazonSpeech v2',
-    tag: 'おすすめ',
-    note: '日本語特化の Zipformer。精度と速度のバランスが良い。句読点なし。',
+    tag: 'バランス型',
+    note: ['日本語特化の Zipformer', '精度と速度のバランスが良い', '句読点なし'],
     repo: 'csukuangfj/reazonspeech-k2-v2',
     kind: 'transducer',
     files: {
@@ -23,7 +39,7 @@ export const MODELS: ModelSpec[] = [
     id: 'reazon-v2-ja-en',
     label: 'ReazonSpeech ja-en',
     tag: '軽量・日英',
-    note: '日本語+英語。低スペック向け。句読点なし。',
+    note: ['日本語+英語', '低スペック向け', '句読点なし'],
     repo: 'csukuangfj/reazonspeech-k2-v2-ja-en',
     kind: 'transducer',
     files: {
@@ -39,7 +55,7 @@ export const MODELS: ModelSpec[] = [
     id: 'sense-voice',
     label: 'SenseVoice Small',
     tag: '句読点あり',
-    note: '中英日韓粤。非自己回帰で高速。句読点・ITN あり。',
+    note: ['中英日韓粤', '非自己回帰で高速', '句読点・ITN あり'],
     repo: 'csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17',
     kind: 'senseVoice',
     files: {
@@ -53,7 +69,7 @@ export const MODELS: ModelSpec[] = [
     id: 'parakeet-ja',
     label: 'Parakeet 0.6B ja',
     tag: '高精度',
-    note: 'NVIDIA 製。高精度だが初回 DL とメモリが重い。句読点あり。',
+    note: ['NVIDIA 製', '高精度だが初回 DL とメモリが重い', '句読点あり'],
     repo: 'csukuangfj/sherpa-onnx-nemo-parakeet-tdt_ctc-0.6b-ja-35000-int8',
     kind: 'nemoCtc',
     files: {
@@ -67,7 +83,7 @@ export const MODELS: ModelSpec[] = [
     id: 'moonshine-tiny-ja',
     label: 'Moonshine tiny ja',
     tag: '最軽量',
-    note: '最軽量。1 区間 6 秒までに分割して認識。',
+    note: ['最軽量', '1 区間 6 秒までに分割して認識'],
     repo: 'csukuangfj2/sherpa-onnx-moonshine-tiny-ja-quantized-2026-02-27',
     kind: 'moonshine',
     files: {
@@ -83,7 +99,7 @@ export const MODELS: ModelSpec[] = [
     id: 'moonshine-base-ja',
     label: 'Moonshine base ja',
     tag: '',
-    note: 'tiny より高精度。1 区間 6 秒までに分割して認識。',
+    note: ['tiny より高精度', '1 区間 6 秒までに分割して認識'],
     repo: 'csukuangfj2/sherpa-onnx-moonshine-base-ja-quantized-2026-02-27',
     kind: 'moonshine',
     files: {
@@ -97,7 +113,9 @@ export const MODELS: ModelSpec[] = [
   },
 ];
 
-export const DEFAULT_MODEL_ID = 'reazon-v2';
+// 端末内の音声認識が使えない環境（Chrome 以外）では FALLBACK_MODEL_ID を既定にする
+export const DEFAULT_MODEL_ID = 'browser-native';
+export const FALLBACK_MODEL_ID = 'reazon-v2';
 
 export const MODEL_CACHE_NAME = 'stt-models-v1';
 

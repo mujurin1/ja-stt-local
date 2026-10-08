@@ -2,7 +2,8 @@
 
 export const SAMPLE_RATE = 16000;
 
-export type ModelKind = 'transducer' | 'senseVoice' | 'nemoCtc' | 'moonshine';
+// native はブラウザ標準の音声認識（worker を使わず画面側で動かす。files は空）
+export type ModelKind = 'transducer' | 'senseVoice' | 'nemoCtc' | 'moonshine' | 'native';
 export type ModelFileRole =
     'encoder' | 'decoder' | 'joiner' | 'model' | 'mergedDecoder' | 'tokens';
 
@@ -16,7 +17,8 @@ export interface ModelSpec {
   label: string;
   // 一覧で名前の横に出す一言（おすすめ／軽量 など）
   tag: string;
-  note: string;
+  // 詳細欄の説明。1 要素 1 行で表示する
+  note: string[];
   repo: string;
   kind: ModelKind;
   files: Partial<Record<ModelFileRole, ModelFile>>;

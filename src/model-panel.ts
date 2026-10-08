@@ -1,6 +1,8 @@
 // モデルタブ: 1 モデル 1 行の一覧（行クリックで選択）＋選択中モデルの詳細。
 // 行ごとに事前ダウンロード・キャッシュ削除ができる。
-import {deleteModel, downloadModel, modelCacheStatus} from './shared/model-cache.ts';
+import {installNative, nativeStatus} from './engine/native-asr.ts';
+import type {NativeStatus} from './engine/native-asr.ts';
+import {deleteModel,downloadModel, modelCacheStatus} from './shared/model-cache.ts';
 import type {CacheStatus} from './shared/model-cache.ts';
 import {MODELS, modelTotalBytes} from './shared/models.ts';
 import type {ModelSpec} from './shared/protocol.ts';
@@ -52,6 +54,9 @@ export class ModelPanel {
   hooks: ModelPanelHooks;
   status = new Map<string, CacheStatus>();
   downloads = new Map<string, Download>();
+  // ブラウザ標準（端末内認識）の日本語言語パックの状態
+  nativeStatus: NativeStatus = 'unavailable';
+  nativeInstall: Promise<boolean> | null = null;
 
   constructor(list: HTMLUListElement, detail: HTMLElement, hooks: ModelPanelHooks) {
     this.list = list;
@@ -60,9 +65,28 @@ export class ModelPanel {
   }
 
   async refresh(): Promise<void> {
-    const results = await Promise.all(MODELS.map((m) => modelCacheStatus(m)));
+    const [results, native] =
+        await Promise.all([Promise.all(MODELS.map((m) => modelCacheStatus(m))), nativeStatus()]);
     MODELS.forEach((m, i) => this.status.set(m.id, results[i] ?? 'none'));
+    this.nativeStatus = this.nativeInstall ? 'downloading' : native;
     this.render();
+  }
+
+  // 言語パックを取得させる（取得中なら同じ処理を待つ）。使えるようになったら true
+  installNative(): Promise<boolean> {
+    this.nativeInstall ??= (async () => {
+      this.nativeStatus = 'downloading';
+      this.render();
+      this.hooks.onCacheChanged();
+      const ok = await installNative();
+      if (!ok) alert('日本語の言語パックを取得できませんでした');
+      this.nativeInstall = null;
+      await this.refresh();
+      this.hooks.onCacheChanged();
+      // refresh() で更新されるが、TS は上の 'downloading' 代入で絞り込んだままなので広げる
+      return (this.nativeStatus as NativeStatus) === 'available';
+    })();
+    return this.nativeInstall;
   }
 
   statusOf(id: string): CacheStatus {
@@ -95,12 +119,30 @@ export class ModelPanel {
     const texts = el('div', 'texts');
     texts.append(el('span', 'label', m.label), tags);
     name.append(el('span', 'radio'), texts);
-    li.append(name, el('span', 'size', `${mb(modelTotalBytes(m))}MB`), this.renderAction(m));
+    const size = m.kind === 'native' ? '-' : `${mb(modelTotalBytes(m))}MB`;
+    li.append(name, el('span', 'size', size), this.renderAction(m));
     return li;
   }
 
   private renderAction(m: ModelSpec): HTMLElement {
     const box = el('div', 'action');
+    if (m.kind === 'native') {
+      switch (this.nativeStatus) {
+        case 'available':
+          break;
+        case 'downloadable':
+          box.append(button('取得', 'small', '日本語の言語パックを Chrome に取得させる',
+                            () => void this.installNative()));
+          break;
+        case 'downloading':
+          box.append(el('span', '', '取得中…'));
+          break;
+        case 'unavailable':
+          box.append(el('span', 'unsupported', '非対応'));
+          break;
+      }
+      return box;
+    }
     const dl = this.downloads.get(m.id);
     if (dl) {
       const pct = dl.total ? Math.floor(dl.loaded / dl.total * 100) : 0;
@@ -126,7 +168,8 @@ export class ModelPanel {
     const c = COMMERCIAL[m.commercial];
     const lic = el('p', 'license');
     lic.append(`ライセンス: ${m.license} `, el('span', `badge ${c.cls}`, c.label));
-    this.detail.replaceChildren(el('p', 'detail-name', m.label), el('p', '', m.note), lic);
+    const notes = m.note.map((line) => el('p', '', line));
+    this.detail.replaceChildren(el('p', 'detail-name', m.label), ...notes, lic);
   }
 
   async download(m: ModelSpec): Promise<void> {

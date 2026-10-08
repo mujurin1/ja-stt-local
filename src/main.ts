@@ -5,13 +5,14 @@ import {AsrClient} from './engine/asr-client.ts';
 import type {AsrState} from './engine/asr-client.ts';
 import {DenoiseClient} from './engine/denoise-client.ts';
 import type {DenoiseState} from './engine/denoise-client.ts';
-import {loadSettings, saveSettings} from './settings.ts';
+import {NativeAsr} from './engine/native-asr.ts';
+import {hasSavedSettings, loadSettings, saveSettings} from './settings.ts';
 import type {AppSettings} from './settings.ts';
 import {ModelPanel} from './model-panel.ts';
 import {SendPanel} from './send/panel.ts';
 import {SEND_TARGETS} from './send/targets.ts';
 import {modelCacheStatus} from './shared/model-cache.ts';
-import {MODEL_CACHE_NAME, MODELS, modelTotalBytes} from './shared/models.ts';
+import {FALLBACK_MODEL_ID, MODEL_CACHE_NAME, MODELS, modelTotalBytes} from './shared/models.ts';
 import {SAMPLE_RATE} from './shared/protocol.ts';
 import type {AsrEvent, AsrSettings, ModelSpec, Segment} from './shared/protocol.ts';
 import {download, formatClock, toJson, toSrt, toTxt, toVtt} from './transcript.ts';
@@ -31,6 +32,7 @@ const ui = {
   loadProgress: $<HTMLDivElement>('loadProgress'),
   loadBar: $<HTMLDivElement>('loadBar'),
   loadText: $<HTMLSpanElement>('loadText'),
+  nativeMicNote: $<HTMLParagraphElement>('nativeMicNote'),
   deviceSelect: $<HTMLSelectElement>('deviceSelect'),
   startBtn: $<HTMLButtonElement>('startBtn'),
   levelBar: $<HTMLDivElement>('levelBar'),
@@ -66,6 +68,8 @@ const vendorBase = new URL('./vendor/', location.href).href;
 let asrState: AsrState | 'idle' = 'idle';
 let readyWaiters: {resolve: () => void; reject: (e: Error) => void}[] = [];
 let recording = false;
+// 録音中のものがブラウザ標準の音声認識か（録音中にモデルを切り替えても正しく止めるため）
+let recordingNative = false;
 let startPending = false;
 let fileBusy = false;
 let exportBaseName = '';
@@ -73,6 +77,11 @@ let wakeLock: WakeLockSentinel | null = null;
 
 function currentModel(): ModelSpec {
   return MODELS.find((m) => m.id === settings.modelId) ?? MODELS[0]!;
+}
+
+// ブラウザ標準の音声認識は worker・マイク取り込みを使わず NativeAsr だけで動く
+function isNative(): boolean {
+  return currentModel().kind === 'native';
 }
 
 function mb(bytes: number): string {
@@ -239,11 +248,48 @@ const capture = new MicCapture(captureOptions(), {
   onState: handleCaptureState,
 });
 
+const native = new NativeAsr({
+  onPartial: setPartial,
+  onFinal(seg) {
+    appendSegment(seg);
+    sendPanel.dispatch(seg.text, false);
+  },
+  onFatal(message) {
+    void stopRecording();
+    alert(`音声認識を開始できません: ${message}`);
+  },
+});
+
+function showNativePill(): void {
+  switch (modelPanel.nativeStatus) {
+    case 'available':
+      setPill(`準備完了: ${currentModel().label}`, 'ok');
+      break;
+    case 'downloadable':
+      setPill('言語パック未取得', '');
+      break;
+    case 'downloading':
+      setPill('言語パックを取得中…', 'busy');
+      break;
+    case 'unavailable':
+      setPill('このブラウザは端末内の音声認識に非対応です', 'error');
+      break;
+  }
+}
+
 function selectModel(spec: ModelSpec): void {
   if (spec.id === settings.modelId) return;
+  // ブラウザ標準とモデルをまたぐ切り替えは、使う録音経路が変わるので一旦止める
+  if (recording && (spec.kind === 'native') !== isNative()) void stopRecording();
   settings.modelId = spec.id;
   saveSettings(settings);
   renderModelInfo();
+  if (spec.kind === 'native') {
+    showNativePill();
+    updateStartButton();
+    return;
+  }
+  if (asrState === 'idle') setPill('モデル未取得', '');
   // 読み込み済み（または読み込み中）なら新しいモデルで起こし直す。未取得なら開始時に取得する
   if (asrState !== 'idle') loadModel();
   else void modelCacheStatus(spec).then((st) => st === 'cached' && loadModel());
@@ -253,10 +299,17 @@ function selectModel(spec: ModelSpec): void {
 const modelPanel = new ModelPanel(ui.modelList, ui.modelDetail, {
   currentId: () => settings.modelId,
   onSelect: selectModel,
-  onCacheChanged: () => void updateStorageInfo(),
+  onCacheChanged() {
+    void updateStorageInfo();
+    if (isNative()) {
+      showNativePill();
+      updateStartButton();
+    }
+  },
 });
 
 function loadModel(): void {
+  if (isNative()) return;
   void navigator.storage?.persist?.();
   asr.load(currentModel(), settings.asr);
 }
@@ -275,6 +328,16 @@ function updateStartButton(): void {
   if (recording) {
     b.textContent = '■ 停止';
     b.disabled = false;
+  } else if (isNative()) {
+    const labels = {
+      available: '● 開始',
+      downloadable: '● 開始（初回は言語パックを取得）',
+      downloading: '言語パックを取得中…',
+      unavailable: '● 開始（このブラウザは非対応）',
+    } as const;
+    const st = modelPanel.nativeStatus;
+    b.textContent = labels[st];
+    b.disabled = fileBusy || st === 'downloading' || st === 'unavailable';
   } else if (asrState === 'loading' || asrState === 'restarting' || startPending) {
     b.textContent = '読み込み中…';
     b.disabled = true;
@@ -297,6 +360,18 @@ async function requestWakeLock(): Promise<void> {
 
 async function startRecording(): Promise<void> {
   if (recording) return;
+  if (isNative()) {
+    if (modelPanel.nativeStatus !== 'available' && !await modelPanel.installNative()) return;
+    if (recording || !isNative()) return;
+    recording = true;
+    recordingNative = true;
+    exportBaseName = '';
+    ui.captureState.textContent = '録音中';
+    native.start();
+    updateStartButton();
+    void requestWakeLock();
+    return;
+  }
   if (asrState !== 'ready') {
     startPending = true;
     updateStartButton();
@@ -320,9 +395,15 @@ async function stopRecording(): Promise<void> {
   if (!recording) return;
   recording = false;
   updateStartButton();
-  await capture.stop();
-  denoise.reset();
-  await asr.flush();
+  if (recordingNative) {
+    recordingNative = false;
+    ui.captureState.textContent = '';
+    await native.stop();
+  } else {
+    await capture.stop();
+    denoise.reset();
+    await asr.flush();
+  }
   await wakeLock?.release().catch(() => {});
   wakeLock = null;
 }
@@ -339,6 +420,13 @@ async function refreshDevices(): Promise<void> {
 // ---- ファイル ----
 
 async function transcribeFile(file: File): Promise<void> {
+  if (isNative()) {
+    ui.fileProgress.hidden = false;
+    ui.fileBar.style.width = '0';
+    ui.fileText.textContent = 'ブラウザ標準の音声認識はファイルに対応していません。モデルタブで他のモデルを選んでください。';
+    ui.fileInput.value = '';
+    return;
+  }
   if (segments.length > 0 && !confirm('現在の文字起こしを消去して、ファイルを処理しますか？')) return;
   if (recording) await stopRecording();
   fileBusy = true;
@@ -399,6 +487,7 @@ function renderModelInfo(): void {
   const m = currentModel();
   modelPanel.render();
   ui.currentModelName.textContent = `モデル: ${m.label}`;
+  ui.nativeMicNote.hidden = m.kind !== 'native';
   ui.licenseInfo.textContent = `モデル: ${m.repo}（${m.license}）`;
 }
 
@@ -542,7 +631,16 @@ async function main(): Promise<void> {
   }
 
   denoise.setEnabled(settings.gtcrn);
-  if (await modelCacheStatus(currentModel()) === 'cached') loadModel();
+  if (isNative()) {
+    await modelPanel.refresh();
+    // 既定値のまま開いた非対応ブラウザ（Chrome 以外）は、ダウンロード型の既定モデルに戻す
+    if (modelPanel.nativeStatus === 'unavailable' && !hasSavedSettings()) {
+      selectModel(MODELS.find((m) => m.id === FALLBACK_MODEL_ID)!);
+      return;
+    }
+    showNativePill();
+    updateStartButton();
+  } else if (await modelCacheStatus(currentModel()) === 'cached') loadModel();
   else setPill('モデル未取得', '');
 }
 

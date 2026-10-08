@@ -1,4 +1,5 @@
-import {DEFAULT_MODEL_ID, MODELS} from './shared/models.ts';
+import {nativeAsrSupported} from './engine/native-asr.ts';
+import {DEFAULT_MODEL_ID, FALLBACK_MODEL_ID, MODELS} from './shared/models.ts';
 import type {AsrSettings} from './shared/protocol.ts';
 
 export interface AppSettings {
@@ -20,11 +21,12 @@ export function defaultThreads(): number {
 
 export function defaultSettings(): AppSettings {
   return {
-    modelId: DEFAULT_MODEL_ID,
+    modelId: nativeAsrSupported() ? DEFAULT_MODEL_ID : FALLBACK_MODEL_ID,
     deviceId: '',
-    browserNoiseSuppression: true,
-    browserEchoCancellation: true,
-    browserAutoGain: true,
+    // ノイズ対策はどのモデルでも認識精度を下げがちなので既定はすべて OFF
+    browserNoiseSuppression: false,
+    browserEchoCancellation: false,
+    browserAutoGain: false,
     gtcrn: false,
     showTimestamps: true,
     asr: {
@@ -36,6 +38,10 @@ export function defaultSettings(): AppSettings {
       numThreads: defaultThreads(),
     },
   };
+}
+
+export function hasSavedSettings(): boolean {
+  return localStorage.getItem(STORAGE_KEY) !== null;
 }
 
 export function loadSettings(): AppSettings {
