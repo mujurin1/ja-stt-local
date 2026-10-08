@@ -1,7 +1,10 @@
 // 棒読みちゃん（ユーザー PC 上）へ 1 文ずつ読み上げを依頼する。
 // http: 標準の HTTP 連携 GET http://localhost:50080/Talk?text=&voice=&volume=&speed=&tone=（プラグイン不要）
-//   応答に CORS / CORP ヘッダーが無いため no-cors で投げっぱなしにする。COEP(require-corp) 下では
-//   リクエストは届いても応答がブロックされ fetch は失敗扱いになるので、成否は判別できない（confirmed: false）。
+//   CORS ヘッダーは Ver0.1.11.0 Beta21 以降でしか付かないため、旧版でも届くよう no-cors で投げっぱなしにする。
+//   no-cors の応答は CORP が無いと COEP(require-corp) 下でブロックされ fetch は失敗扱いになるので、
+//   成否は判別できない（confirmed: false）。
+//   声の一覧は GET /GetVoiceList（{voiceList: [{id, kind, name, alias}]}）で取れる。Beta21 以降は
+//   Access-Control-Allow-Origin が付くので CORS で読める。旧版・未起動なら取得できず、標準の 8 声で代用する。
 // ws: WebSocket プラグイン（xztaityozx/BouyomiChan-WebSocket-Plugin, ws://localhost:50002/）
 //   "command<bouyomi>speed<bouyomi>tone<bouyomi>volume<bouyomi>voice<bouyomi>text" を 1 接続 1 メッセージで送る。
 //   応答は無いが、接続できたかは分かる。
@@ -53,6 +56,55 @@ export const BOUYOMI_VOICES: readonly {id: number; name: string}[] = [
 ];
 
 const HTTP_TIMEOUT_MS = 5_000;
+const VOICE_LIST_TIMEOUT_MS = 5_000;
+
+interface VoiceListJson {
+  voiceList?: {id?: unknown; kind?: unknown; name?: unknown; alias?: unknown}[];
+}
+
+// 棒読みちゃんで使える声の一覧（先頭に「棒読みちゃんの設定」= 0 を付ける）。
+// 取得できなければ理由を書いた Error を投げる（呼び出し側は BOUYOMI_VOICES で代用する）
+export async function listBouyomiVoices(c: BouyomiConfig): Promise<{id: number; name: string}[]> {
+  const url = `http://${hostOf(c)}:${c.httpPort}/GetVoiceList`;
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      mode: 'cors',
+      credentials: 'omit',
+      cache: 'no-store',
+      signal: AbortSignal.timeout(VOICE_LIST_TIMEOUT_MS),
+    });
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'TimeoutError') {
+      throw new Error(`棒読みちゃんが応答しません（${VOICE_LIST_TIMEOUT_MS / 1000} 秒でタイムアウト）: ${url}`);
+    }
+    // 未起動・LNA 拒否・旧版（CORS ヘッダー無し）はどれも TypeError になり区別できない
+    throw new Error(
+      `棒読みちゃんから声の一覧を取得できませんでした（${url}）。` +
+        '棒読みちゃんが起動しているか、Ver0.1.11.0 Beta21 以降かを確認してください。' +
+        '取得できなくても、標準の声（女性1〜機械2）は選べます。',
+    );
+  }
+  if (!res.ok) {
+    throw new Error(`棒読みちゃんがエラーを返しました（${res.status}）。このバージョンは声の一覧の取得に対応していない可能性があります。標準の声は選べます。`);
+  }
+  let json: VoiceListJson;
+  try {
+    json = (await res.json()) as VoiceListJson;
+  } catch {
+    throw new Error('棒読みちゃんの応答を読み取れませんでした。標準の声は選べます。');
+  }
+  const voices = (json.voiceList ?? []).flatMap((v) => {
+    const id = Number(v.id);
+    if (!Number.isInteger(id) || id <= 0) return [];
+    const name = (typeof v.alias === 'string' && v.alias) || (typeof v.name === 'string' && v.name) || `声 ${id}`;
+    // 標準（AquesTalk）以外は種類を添えて区別できるようにする
+    const kind = typeof v.kind === 'string' && v.kind && v.kind !== 'AquesTalk' ? `（${v.kind}）` : '';
+    return [{id, name: name + kind}];
+  });
+  if (!voices.length) throw new Error('棒読みちゃんから声の一覧が返りませんでした。標準の声は選べます。');
+  return [BOUYOMI_VOICES[0]!, ...voices];
+}
 const WS_OPEN_TIMEOUT_MS = 5_000;
 // プラグインは受信・処理後に接続を閉じる。閉じられなくてもこの時間で次へ進む
 const WS_CLOSE_WAIT_MS = 2_000;

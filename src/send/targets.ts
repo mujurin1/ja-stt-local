@@ -1,6 +1,6 @@
 // 送信タブに並べる送信先の定義（設定項目と生成関数）。
 import {
-  BOUYOMI_PARAM_RANGES, BOUYOMI_VOICES, createBouyomiSender, DEFAULT_BOUYOMI_CONFIG,
+  BOUYOMI_PARAM_RANGES, BOUYOMI_VOICES, createBouyomiSender, DEFAULT_BOUYOMI_CONFIG, listBouyomiVoices,
 } from './bouyomi.ts';
 import type {BouyomiConfig} from './bouyomi.ts';
 import {
@@ -27,6 +27,7 @@ const bouyomi: TargetDescriptor = {
         [bold('HTTP 方式'), '：棒読みちゃん標準の HTTP 連携（ポート 50080）を使います'],
         ['起動時に「HTTPサーバを開始できませんでした」と出る場合は、他のアプリがポートを使っていないか確認するか、棒読みちゃんとこの画面のポート番号を揃えてください'],
         ['※ブラウザの制約で応答を読めないため、読み上げられたかは耳で確認してください'],
+        ['声の「一覧を取得」で、SAPI5 などを含む棒読みちゃんの声を読み込めます（Ver0.1.11.0 Beta21 以降・HTTP ポートを使用。WebSocket 方式でも同じ）。取得できない場合も標準の声（女性1〜機械2）は選べます'],
         [bold('WebSocket 方式'), '：', code('Plugin_WebSocket.dll'), '（',
          link('https://github.com/xztaityozx/BouyomiChan-WebSocket-Plugin', 'xztaityozx/BouyomiChan-WebSocket-Plugin'),
          '）を棒読みちゃんのフォルダに置き、「その他」タブのプラグインで「WebSocketサーバー」を有効にしてください（ポート 50002 固定）'],
@@ -51,7 +52,10 @@ const bouyomi: TargetDescriptor = {
       key: 'voice',
       label: '声',
       type: 'select',
+      // 取得に失敗したら選択肢は標準の声のまま（SAPI5 等は一覧の取得が必要）
       options: BOUYOMI_VOICES.map((v) => ({value: String(v.id), label: v.name})),
+      loadOptions: async (c) => (await listBouyomiVoices({...DEFAULT_BOUYOMI_CONFIG, ...c} as BouyomiConfig))
+          .map((v) => ({value: String(v.id), label: v.name})),
     },
     {key: 'speed', label: '速度', type: 'number', ...BOUYOMI_PARAM_RANGES.speed, min: -1, hint: '-1 = 棒読みちゃんの設定'},
     {key: 'tone', label: '音程', type: 'number', ...BOUYOMI_PARAM_RANGES.tone, min: -1, hint: '-1 = 棒読みちゃんの設定'},
