@@ -19,6 +19,8 @@ export interface Field {
   options?: FieldOption[];
   // select の選択肢を送信先から取得する（VOICEVOX の話者一覧など）
   loadOptions?: (config: Record<string, unknown>) => Promise<FieldOption[]>;
+  // 表示時に loadOptions を自動で呼ぶ（ブラウザ内で完結して失敗しにくいもの用）
+  autoLoad?: boolean;
   hint?: string;
 }
 
@@ -104,7 +106,7 @@ export class SendPanel {
 
   private render(): void {
     const intro = el('p', 'note',
-        '確定した文を、この PC で動いている読み上げアプリに読ませます（ブラウザから直接 localhost に送信）。');
+        '確定した文を読み上げます。ブラウザ内蔵の声か、この PC で動いている読み上げアプリ（ブラウザから直接 localhost に送信）を使えます');
     const includeFile = el('label', 'check');
     const cb = el('input');
     cb.type = 'checkbox';
@@ -208,6 +210,7 @@ export class SendPanel {
           }
         });
         wrap.append(reload);
+        if (f.autoLoad) void f.loadOptions(this.configOf(t)).then(fill).catch(() => {});
       }
     } else {
       const input = el('input');

@@ -3,6 +3,10 @@ import {
   BOUYOMI_PARAM_RANGES, BOUYOMI_VOICES, createBouyomiSender, DEFAULT_BOUYOMI_CONFIG,
 } from './bouyomi.ts';
 import type {BouyomiConfig} from './bouyomi.ts';
+import {
+  AUTO_VOICE, BROWSER_TTS_PARAM_RANGES, createBrowserTtsSender, DEFAULT_BROWSER_TTS_CONFIG, listLocalVoices,
+} from './browser-tts.ts';
+import type {BrowserTtsConfig} from './browser-tts.ts';
 import {badge, bold, code, helpBox, helpSection, link} from './help.ts';
 import type {TargetDescriptor} from './panel.ts';
 import {
@@ -94,4 +98,36 @@ const voicevox: TargetDescriptor = {
   create: (c) => createVoicevoxSender(c as unknown as VoicevoxConfig),
 };
 
-export const SEND_TARGETS: TargetDescriptor[] = [bouyomi, voicevox];
+const browser: TargetDescriptor = {
+  id: 'browser',
+  label: 'ブラウザ読み上げ',
+  description: 'ブラウザ内蔵の声（端末内の音声合成）で読み上げる',
+  renderHelp: () => helpSection(
+      ['ブラウザ読み上げについて'],
+      helpBox('info', [
+        ['準備は不要です。OS に入っている声で、この PC の中だけで読み上げます'],
+        ['オンライン音声（Google の声や Microsoft の「Online」の声）は使わず、一覧にも出しません'],
+        ['日本語の声が無い場合は、Windows の「設定 → 時刻と言語 → 音声」から日本語の音声を追加してください'],
+        ['「自動」は端末内の日本語の声から最初のものを使います'],
+      ])),
+  defaultConfig: {...DEFAULT_BROWSER_TTS_CONFIG},
+  fields: [
+    {
+      key: 'voice',
+      label: '声',
+      type: 'select',
+      options: [{value: AUTO_VOICE, label: '自動（端末内の日本語の声）'}],
+      autoLoad: true,
+      loadOptions: async () => [
+        {value: AUTO_VOICE, label: '自動（端末内の日本語の声）'},
+        ...(await listLocalVoices()).map((v) => ({value: v.voiceURI, label: `${v.name}（${v.lang}）`})),
+      ],
+    },
+    {key: 'rate', label: '速度', type: 'number', ...BROWSER_TTS_PARAM_RANGES.rate},
+    {key: 'pitch', label: '高さ', type: 'number', ...BROWSER_TTS_PARAM_RANGES.pitch},
+    {key: 'volume', label: '音量', type: 'number', ...BROWSER_TTS_PARAM_RANGES.volume},
+  ],
+  create: (c) => createBrowserTtsSender(c as unknown as BrowserTtsConfig),
+};
+
+export const SEND_TARGETS: TargetDescriptor[] = [browser, bouyomi, voicevox];

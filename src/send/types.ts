@@ -1,7 +1,7 @@
-// 確定した認識結果を外部の読み上げアプリ（棒読みちゃん / VOICEVOX）へ送るための共通インターフェース。
+// 確定した認識結果を読み上げ（ブラウザ内蔵 / 棒読みちゃん / VOICEVOX）へ送るための共通インターフェース。
 // 各送信先は src/send/<id>.ts に実装し、画面（送信タブ）からはこの型だけを通して使う。
 
-export type SenderId = 'bouyomi' | 'voicevox';
+export type SenderId = 'browser' | 'bouyomi' | 'voicevox';
 
 export interface SendResult {
   // 送信先から応答を確認できたか。no-cors 等で応答を読めない場合は false（送れてはいる可能性がある）
