@@ -26,7 +26,8 @@ export interface TargetDescriptor {
   id: SenderId;
   label: string;
   description: string;
-  help: string;
+  // 「＿側の準備」欄を組み立てる（部品は help.ts）
+  renderHelp(): HTMLElement;
   fields: Field[];
   defaultConfig: Record<string, unknown>;
   create(config: Record<string, unknown>): SpeechSender<unknown>;
@@ -169,10 +170,7 @@ export class SendPanel {
     test.addEventListener('click', () => this.manager.test(t.id));
     actions.append(test);
 
-    const help = el('details', 'send-help');
-    help.append(el('summary', '', `${t.label} 側の準備`), el('pre', '', t.help));
-
-    card.append(head, fields, actions, help);
+    card.append(head, fields, actions, t.renderHelp());
     return card;
   }
 

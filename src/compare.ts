@@ -62,7 +62,7 @@ export class ComparePanel {
       if (spec) this.add(spec);
     });
     this.totalInfo = el('span', 'note');
-    const clearBtn = el('button', '', 'クリア');
+    const clearBtn = el('button', 'danger', 'クリア');
     clearBtn.addEventListener('click', () => this.clear());
     const toolbar = el('div', 'toolbar');
     toolbar.append(this.addSelect, this.totalInfo, el('span', 'spacer'), clearBtn);

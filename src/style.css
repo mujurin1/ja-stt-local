@@ -86,14 +86,15 @@ header h1 { font-size: 1.2rem; margin: 0; }
 main {
   flex: 1;
   display: grid;
-  grid-template-columns: minmax(320px, 400px) 1fr;
+  /* 右は minmax(0, 1fr) にして中身の幅で広がらないようにする（比較の列などは右の中で横スクロール） */
+  grid-template-columns: 380px minmax(0, 1fr);
   gap: 16px;
   padding: 16px 20px;
   min-height: 0;
 }
 
 @media (max-width: 820px) {
-  main { grid-template-columns: 1fr; }
+  main { grid-template-columns: minmax(0, 1fr); }
 }
 
 .panel {
@@ -120,7 +121,7 @@ button:disabled { opacity: 0.5; cursor: default; }
   margin: 0 0 12px;
   padding: 8px 12px;
   border-radius: 8px;
-  background: var(--accent-soft);
+  background: color-mix(in srgb, var(--danger) 10%, var(--panel));
   font-size: 0.85rem;
   line-height: 1.5;
 }
@@ -236,12 +237,12 @@ button.primary.recording { background: var(--danger); border-color: var(--danger
 .model-row .saved { color: var(--ok); }
 .model-row .saved::before { content: "✓ "; }
 .model-row button.small { padding: 3px 12px; font-size: 0.85rem; }
-.model-row button.danger {
+button.danger {
   color: var(--danger);
   background: color-mix(in srgb, var(--danger) 8%, var(--panel));
   border-color: color-mix(in srgb, var(--danger) 35%, var(--panel));
 }
-.model-row button.danger:hover:not(:disabled) {
+button.danger:hover:not(:disabled) {
   background: color-mix(in srgb, var(--danger) 16%, var(--panel));
 }
 .model-row button.link {
@@ -344,16 +345,19 @@ button.primary.recording { background: var(--danger); border-color: var(--danger
   text-decoration: underline;
 }
 .send-help summary { cursor: pointer; font-size: 0.85rem; color: var(--muted); }
-.send-help pre {
-  white-space: pre-wrap;
-  font: inherit;
+.help-badge { color: var(--danger); font-weight: 700; }
+.help-box {
   font-size: 0.85rem;
   line-height: 1.6;
   margin: 6px 0 0;
   padding: 8px 10px;
-  background: var(--hover);
   border-radius: 6px;
+  overflow-wrap: anywhere;
 }
+.help-box p { margin: 0; }
+.help-box code { font-size: 0.95em; padding: 0 3px; border-radius: 3px; background: var(--panel); }
+.help-box.info { background: var(--accent-soft); }
+.help-box.important { background: color-mix(in srgb, var(--danger) 10%, var(--panel)); }
 .send-log-head { display: flex; align-items: baseline; justify-content: space-between; }
 .send-log-head h3 { margin: 0; font-size: 0.85rem; color: var(--muted); }
 .send-log { list-style: none; margin: 0; padding: 0; font-size: 0.85rem; max-height: 40vh; overflow-y: auto; }
@@ -388,7 +392,6 @@ button.primary.recording { background: var(--danger); border-color: var(--danger
   border-top: 1px solid var(--line);
   font-size: 1.15rem;
   line-height: 1.8;
-  max-height: calc(100vh - 200px);
 }
 .transcript ol { list-style: none; margin: 0; padding: 0; }
 .transcript li { padding: 2px 0; }
@@ -444,11 +447,35 @@ button.primary.recording { background: var(--danger); border-color: var(--danger
   overflow-y: auto;
   padding: 6px 10px;
   line-height: 1.7;
-  max-height: calc(100vh - 280px);
-  min-height: 40vh;
 }
 .compare-body ol { list-style: none; margin: 0; padding: 0; }
 .compare-body li { padding: 2px 0; }
+
+/* ---- 画面の高さに収める（縦並びになる狭い画面ではページ全体をスクロール） ---- */
+
+@media (max-width: 820px) {
+  .transcript { min-height: 50vh; max-height: 70vh; }
+  .compare-body { min-height: 40vh; max-height: 60vh; }
+}
+
+@media (min-width: 821px) {
+  body { height: 100vh; height: 100dvh; min-height: 0; overflow: hidden; }
+  main { grid-template-rows: minmax(0, 1fr); }
+  .panel { min-height: 0; min-width: 0; display: flex; flex-direction: column; }
+  .controls { align-self: stretch; }
+  .transcript-panel { min-height: 0; }
+  /* タブの中身はタブエリアごとにスクロール */
+  .panel > .tab-panel { flex: 1; min-height: 0; overflow-y: auto; }
+  /* モデルタブは一覧だけスクロールし、詳細と削除ボタンは下に固定 */
+  .panel > .tab-panel[data-panel=model] { overflow: hidden; }
+  .model-list { flex: 1 1 auto; min-height: 80px; overflow-y: auto; }
+  .model-detail, .tab-panel[data-panel=model] > .row { flex: none; }
+  /* 文字起こし・比較は本文の欄だけスクロール */
+  .panel > .transcript-tab, .panel > .compare-tab { overflow: hidden; }
+  .transcript { min-height: 0; }
+  .compare-grid { grid-auto-rows: minmax(0, 1fr); }
+  .compare-col, .compare-body { min-height: 0; }
+}
 
 footer {
   display: flex;

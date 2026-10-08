@@ -52,16 +52,6 @@ export const BOUYOMI_VOICES: readonly {id: number; name: string}[] = [
   {id: 8, name: '機械2'},
 ];
 
-export const BOUYOMI_SETUP_HELP = [
-  '棒読みちゃん（Windows 版）を起動しておいてください。',
-  'HTTP 方式: 棒読みちゃん標準の HTTP 連携（ポート 50080）を使います。起動時に「HTTPサーバを開始できませんでした」と出る場合は、',
-  '他のアプリがポートを使っていないか確認するか、棒読みちゃんとこの画面のポート番号を揃えてください。',
-  '  ※ブラウザの制約で応答を読めないため、読み上げられたかは耳で確認してください。',
-  'WebSocket 方式: Plugin_WebSocket.dll（xztaityozx/BouyomiChan-WebSocket-Plugin）を棒読みちゃんのフォルダに置き、',
-  '「その他」タブのプラグインで「WebSocketサーバー」を有効にしてください（ポート 50002 固定）。接続の成否を確認できます。',
-  'Chrome / Edge で「ローカル ネットワーク上のデバイスへのアクセス」の許可を求められたら「許可」を選んでください。',
-].join('\n');
-
 const HTTP_TIMEOUT_MS = 5_000;
 const WS_OPEN_TIMEOUT_MS = 5_000;
 // プラグインは受信・処理後に接続を閉じる。閉じられなくてもこの時間で次へ進む

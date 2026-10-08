@@ -72,7 +72,9 @@
       </div>
 
       <div class="tab-panel" data-panel="mic" role="tabpanel">
-        <p id="nativeMicNote" class="notice" hidden>ブラウザ標準には、このタブの設定は効きません（ブラウザ既定のマイクで認識します）。比較で追加したモデルには効きます</p>
+        <p id="nativeMicNote" class="notice" hidden>
+          ブラウザ標準には、このタブの設定は効きません（ブラウザ既定のマイクで認識します）<br>
+          比較で追加したモデルには効きます</p>
         <div class="field">
           <label for="deviceSelect">入力デバイス</label>
           <select id="deviceSelect"><option value="">既定のデバイス</option></select>
@@ -123,13 +125,13 @@
       <div class="tab-panel transcript-tab" data-panel="transcript" role="tabpanel">
       <div class="toolbar">
         <label><input type="checkbox" id="optTimestamps"> 時刻を表示</label>
+        <button id="clearBtn" class="danger">クリア</button>
         <span class="spacer"></span>
         <button id="copyBtn">コピー</button>
         <button data-export="txt">TXT</button>
         <button data-export="srt">SRT</button>
         <button data-export="vtt">VTT</button>
         <button data-export="json">JSON</button>
-        <button id="clearBtn">クリア</button>
       </div>
       <div id="transcript" class="transcript" aria-live="polite">
         <ol id="finalList"></ol>
